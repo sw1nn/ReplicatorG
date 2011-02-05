@@ -32,10 +32,10 @@ package replicatorg.app;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Font;
-import java.awt.Frame;
 import java.awt.Image;
 import java.awt.MediaTracker;
 import java.awt.Toolkit;
+import java.awt.TrayIcon;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
@@ -68,7 +68,6 @@ import java.util.prefs.Preferences;
 
 import javax.imageio.ImageIO;
 import javax.swing.JComponent;
-import javax.swing.JOptionPane;
 import javax.swing.JPopupMenu;
 import javax.swing.JRootPane;
 import javax.swing.KeyStroke;
@@ -76,6 +75,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 
 import replicatorg.app.ui.MainWindow;
+import replicatorg.app.ui.NotificationHandler;
 import replicatorg.uploader.FirmwareUploader;
 import ch.randelshofer.quaqua.QuaquaManager;
 
@@ -246,6 +246,7 @@ public class Base {
 	 * The main UI window.
 	 */
 	MainWindow editor = null;
+	private static NotificationHandler notificationHandler;
 
 	private static final String[] supportedExtensions = {
 			"gcode", "ngc",
@@ -401,11 +402,16 @@ public class Base {
 
 		// use native popups so they don't look so crappy on osx
 		JPopupMenu.setDefaultLightWeightPopupEnabled(false);
-
+		
 		SwingUtilities.invokeLater(new Runnable() {
-		    public void run() {
+		    private TrayIcon trayIcon;
+
+			public void run() {
 				// build the editor object
 				editor = new MainWindow();
+				
+				notificationHandler = NotificationHandler.Factory.getHandler(editor, Base.preferences.getBoolean("ReplicatorG.preferSystemTrayNotifications", false));
+
 				// Get sizing preferences. This is an issue of contention; let's look at how
 				// other programs decide how to size themselves.
 				editor.restorePreferences();
@@ -730,21 +736,16 @@ public class Base {
 	 * bummer, but something to notify the user about.
 	 */
 	static public void showMessage(String title, String message) {
-		if (title == null)
-			title = "Message";
-		JOptionPane.showMessageDialog(new Frame(), message, title,
-				JOptionPane.INFORMATION_MESSAGE);
+		notificationHandler.showMessage(title,message);
 	}
 
 	/**
 	 * Non-fatal error message with optional stack trace side dish.
 	 */
 	static public void showWarning(String title, String message, Exception e) {
-		if (title == null)
-			title = "Warning";
-		JOptionPane.showMessageDialog(new Frame(), message, title,
-				JOptionPane.WARNING_MESSAGE);
 
+		notificationHandler.showWarning(title, message, e);
+		
 		if (e != null)
 			e.printStackTrace();
 	}
@@ -755,11 +756,9 @@ public class Base {
 	 * ReplicatorG to continue running.
 	 */
 	static public void quitWithError(String title, String message, Throwable e) {
-		if (title == null)
-			title = "Error";
-		JOptionPane.showMessageDialog(new Frame(), message, title,
-				JOptionPane.ERROR_MESSAGE);
 
+		notificationHandler.showError(title, message, e);
+		
 		if (e != null)
 			e.printStackTrace();
 		System.exit(1);
@@ -971,5 +970,4 @@ public class Base {
 	static public MachineController getMachine() {
 		return machine;
 	}
-
 }
